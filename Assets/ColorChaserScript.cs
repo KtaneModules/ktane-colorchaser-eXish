@@ -4,7 +4,8 @@ using System.Linq;
 using UnityEngine;
 using System;
 
-public class ColorChaserScript : MonoBehaviour {
+public class ColorChaserScript : MonoBehaviour
+{
 
     public KMAudio audio;
     public KMBombInfo bomb;
@@ -109,7 +110,7 @@ public class ColorChaserScript : MonoBehaviour {
                         colorMoveIndexes[i] = Mod(colorMoveIndexes[i] + 1, 3);
                     }
                     else
-                        colorPositions[i] = curPos;
+                        colorPositions[i] = 6969;
                 }
                 Debug.LogFormat("<Color Chaser #{0}> RYB color positions after move: {1}, {2}, {3}", moduleId, colorPositions[0], colorPositions[1], colorPositions[2]);
                 if (collect)
@@ -122,6 +123,7 @@ public class ColorChaserScript : MonoBehaviour {
                     }
                     if (onYou.Count(x => x) == 1 && colorPositions[collectOrder[0]] == curPos)
                     {
+                        colorPositions[collectOrder[0]] = 6969;
                         collectOrder.RemoveAt(0);
                         if (collectOrder.Count == 0)
                         {
@@ -201,9 +203,9 @@ public class ColorChaserScript : MonoBehaviour {
     }
 
     //twitch plays
-    #pragma warning disable 414
+#pragma warning disable 414
     private readonly string TwitchHelpMessage = @"!{0} scan [Presses the scan button] | !{0} collect [Presses the collect button] | !{0} led [Presses the circular button] | !{0} 1/2/3/4 [Presses the specified display from bottom to top] | Commands are chainable with spaces";
-    #pragma warning restore 414
+#pragma warning restore 414
     IEnumerator ProcessTwitchCommand(string command)
     {
         string[] parameters = command.Split(' ');
@@ -235,5 +237,171 @@ public class ColorChaserScript : MonoBehaviour {
                 buttons[6].OnInteract();
             yield return new WaitForSeconds(.1f);
         }
+    }
+
+    // Autosolver by Quinn Wuest
+
+    public class State
+    {
+        public int Red { get; private set; }
+        public int Yellow { get; private set; }
+        public int Blue { get; private set; }
+        public int Current { get; private set; }
+        public int MoveIx { get; private set; }
+
+        public State(int r, int y, int b, int c, int m)
+        {
+            Red = r;
+            Yellow = y;
+            Blue = b;
+            Current = c;
+            MoveIx = m;
+        }
+
+        public override string ToString()
+        {
+            string temp = "";
+            for (int i = 0; i < 16; i++)
+            {
+                string ch = "-";
+                if (Red == i && Yellow == i & Blue == i)
+                    ch = "n";
+                else if (Red == i && Yellow == i)
+                    ch = "o";
+                else if (Red == i && Blue == i)
+                    ch = "p";
+                else if (Yellow == i && Blue == i)
+                    ch = "g";
+                else if (Red == i)
+                    ch = "r";
+                else if (Yellow == i)
+                    ch = "y";
+                else if (Blue == i)
+                    ch = "b";
+                if (Current == i && ch == "-")
+                    ch = "#";
+                else if (Current == i && ch != "-")
+                    ch = ch.ToUpperInvariant();
+                temp += ch;
+            }
+            return temp;
+        }
+    }
+
+    struct QueueItem
+    {
+        public State State { get; private set; }
+        public State Parent { get; private set; }
+        public int MoveAmount { get; private set; }
+        public QueueItem(State state, State parent, int amount)
+        {
+            State = state;
+            Parent = parent;
+            MoveAmount = amount;
+        }
+    }
+
+    private State GetNewState(State state, int moveAmt)
+    {
+        int rIx = state.Red;
+        int yIx = state.Yellow;
+        int bIx = state.Blue;
+        int cIx = state.Current;
+        int mIx = state.MoveIx;
+
+        rIx = Mod(colorMoves[0][mIx] + rIx, 16);
+        yIx = Mod(colorMoves[1][mIx] + yIx, 16);
+        bIx = Mod(colorMoves[2][mIx] + bIx, 16);
+        cIx = Mod(cIx + moveAmt, 16);
+        mIx = Mod(mIx + 1, 3);
+
+        return new State(rIx, yIx, bIx, cIx, mIx);
+    }
+
+    private int CheckForColor(State state)
+    {
+        if (state.Current == state.Red && state.Current == state.Yellow && state.Current == state.Blue)
+            return 6;
+        if (state.Current == state.Red && state.Current == state.Yellow)
+            return 3;
+        if (state.Current == state.Red && state.Current == state.Blue)
+            return 4;
+        if (state.Current == state.Yellow && state.Current == state.Blue)
+            return 5;
+        if (state.Current == state.Red)
+            return 0;
+        if (state.Current == state.Yellow)
+            return 1;
+        if (state.Current == state.Blue)
+            return 2;
+        return -1;
+    }
+
+    private IEnumerator TwitchHandleForcedSolve()
+    {
+        while (collectOrder.Count != 0)
+        {
+            var goal = collectOrder.First();
+            var currentState = new State(colorPositions[0], colorPositions[1], colorPositions[2], curPos, colorMoveIndexes[goal]);
+            var path = FindPath(currentState, goal);
+            while (animating)
+                yield return null;
+            if (!collect)
+            {
+                buttons[0].OnInteract();
+                yield return new WaitForSeconds(0.1f);
+            }
+            for (int i = 0; i < path.Count; i++)
+            {
+                int mvt = path[i];
+                if ((mvt < 0 && !reverse) || (mvt > 0 && reverse))
+                {
+                    buttons[2].OnInteract();
+                    yield return new WaitForSeconds(0.1f);
+                }
+                mvt = Math.Abs(mvt);
+                buttons[mvt + 2].OnInteract();
+                yield return new WaitForSeconds(0.1f);
+            }
+        }
+        yield break;
+    }
+
+    private List<int> FindPath(State state, int goalColor)
+    {
+        var visited = new Dictionary<State, QueueItem>();
+        var q = new Queue<QueueItem>();
+        q.Enqueue(new QueueItem(state, null, 0));
+        State solutionState = null;
+        int ix = 0;
+        while (q.Count > 0)
+        {
+            var qi = q.Dequeue();
+            if (visited.ContainsKey(qi.State))
+                continue;
+            visited[qi.State] = qi;
+            if (CheckForColor(qi.State) == goalColor && ix != 0)
+            {
+                solutionState = qi.State;
+                break;
+            }
+            var arr = new[] { 1, 2, 3, 4, -1, -2, -3, -4 };
+            for (int i = 0; i < arr.Length; i++)
+                if (new[] { -1, goalColor }.Contains(CheckForColor(GetNewState(qi.State, arr[i]))))
+                    q.Enqueue(new QueueItem(GetNewState(qi.State, arr[i]), qi.State, arr[i]));
+            ix++;
+        }
+        var r = solutionState;
+        var path = new List<int>();
+        while (true)
+        {
+            var nr = visited[r];
+            if (nr.Parent == null)
+                break;
+            path.Add(nr.MoveAmount);
+            r = nr.Parent;
+        }
+        path.Reverse();
+        return path;
     }
 }
