@@ -23,11 +23,11 @@ MonoBehaviour:
     PDF: https://ktane.timwi.de/PDF/Color%20Chaser.pdf
 
 
-    Color Chaser (colorChaserModule) v1.0.0
+    Color Chaser (colorChaserModule) v1.0.1
 
     Module and Concept by eXish
 
     Twitch Plays supported'
-  version: 1.0.0
+  version: 1.0.1
   outputFolder: build
   previewImage: {fileID: 2800000, guid: 5f22bf5bc5821c34895c5fd0d7475a8d, type: 3}

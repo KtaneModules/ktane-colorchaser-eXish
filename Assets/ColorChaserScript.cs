@@ -110,7 +110,7 @@ public class ColorChaserScript : MonoBehaviour
                         colorMoveIndexes[i] = Mod(colorMoveIndexes[i] + 1, 3);
                     }
                     else
-                        colorPositions[i] = 6969;
+                        colorPositions[i] = curPos;
                 }
                 Debug.LogFormat("<Color Chaser #{0}> RYB color positions after move: {1}, {2}, {3}", moduleId, colorPositions[0], colorPositions[1], colorPositions[2]);
                 if (collect)
@@ -123,7 +123,6 @@ public class ColorChaserScript : MonoBehaviour
                     }
                     if (onYou.Count(x => x) == 1 && colorPositions[collectOrder[0]] == curPos)
                     {
-                        colorPositions[collectOrder[0]] = 6969;
                         collectOrder.RemoveAt(0);
                         if (collectOrder.Count == 0)
                         {
@@ -345,7 +344,7 @@ public class ColorChaserScript : MonoBehaviour
             var currentState = new State(colorPositions[0], colorPositions[1], colorPositions[2], curPos, colorMoveIndexes[goal]);
             var path = FindPath(currentState, goal);
             while (animating)
-                yield return null;
+                yield return true;
             if (!collect)
             {
                 buttons[0].OnInteract();
